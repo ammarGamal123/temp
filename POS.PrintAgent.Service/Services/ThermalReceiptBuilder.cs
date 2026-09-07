@@ -140,10 +140,13 @@ public class ThermalReceiptBuilder : IReceiptBuilder
 
     private void SetFontSize(MemoryStream ms, int pointSize)
     {
+        var mapped = PrinterConfigMapper.MapFontSize(pointSize);
+        Write(ms, new byte[] { EscPosCommands.GS, (byte)'!', mapped.ToEscPosByte() });
     }
 
     private void ResetFontSize(MemoryStream ms)
     {
+        Write(ms, EscPosCommands.NormalSize);
     }
 
     #endregion
@@ -156,12 +159,21 @@ public class ThermalReceiptBuilder : IReceiptBuilder
 
         SetFontSize(ms, _config.FontSizeLarge);
         Write(ms, EscPosCommands.BoldOn);
-        if (!string.IsNullOrEmpty(invoice.CompanyNameEn))
+        if (!string.IsNullOrEmpty(invoice.CompanyNameAr))
         {
-            WriteText(ms, invoice.CompanyNameEn);
+            WriteArabic(ms, invoice.CompanyNameAr);
             Write(ms, EscPosCommands.NewLine);
         }
+        ResetFontSize(ms);
         Write(ms, EscPosCommands.BoldOff);
+
+        if (!string.IsNullOrEmpty(invoice.CompanyNameEn))
+        {
+            SetFontSize(ms, _config.FontSizeMedium);
+            WriteText(ms, invoice.CompanyNameEn);
+            Write(ms, EscPosCommands.NewLine);
+            ResetFontSize(ms);
+        }
 
         SetFontSize(ms, _config.FontSizeSmall);
         if (!string.IsNullOrEmpty(invoice.VatNumber))
@@ -310,11 +322,18 @@ public class ThermalReceiptBuilder : IReceiptBuilder
     {
         Write(ms, EscPosCommands.AlignCenter);
 
-        WriteText(ms, $"[QR: {qrData}]");
-        Write(ms, EscPosCommands.NewLine);
+        var qrSize = PrinterConfigMapper.MapQrSize(_config.QrCodeSize);
+        var qrBytes = GenerateQrCodeBytes(qrData, qrSize);
+        if (qrBytes != null)
+        {
+            Write(ms, qrBytes);
+            Write(ms, EscPosCommands.NewLine);
+        }
 
+        SetFontSize(ms, _config.FontSizeSmall);
         WriteText(ms, "ZATCA QR Code");
         Write(ms, EscPosCommands.NewLine);
+        ResetFontSize(ms);
     }
 
     private byte[]? GenerateQrCodeBytes(string data, byte moduleSize)
