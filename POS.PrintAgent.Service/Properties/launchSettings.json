@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "POS.PrintAgent.Service": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:61708;http://localhost:61709"
+    }
+  }
+}

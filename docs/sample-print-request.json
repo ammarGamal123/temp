@@ -1,0 +1,67 @@
+{
+  "printerName": "Microsoft Print to PDF",
+  "jobType": 0,
+  "printerConfig": {
+    "name": "Microsoft Print to PDF",
+    "printerType": "thermal",
+    "paperWidth": 80,
+    "paperHeight": 200,
+    "dpi": 203,
+    "marginTop": 2,
+    "marginBottom": 2,
+    "marginLeft": 1,
+    "marginRight": 1,
+    "fontSizeSmall": 8,
+    "fontSizeMedium": 10,
+    "fontSizeLarge": 14,
+    "qrCodeSize": 80,
+    "barcodeSize": 60,
+    "categoryId": 0,
+    "isDefault": true,
+    "isActive": true
+  },
+  "invoice": {
+    "companyNameAr": "شركة عريب",
+    "companyNameEn": "Araib Group",
+    "vatNumber": "300000000000003",
+    "crNumber": "1010000000",
+    "address": "Riyadh, Saudi Arabia",
+    "phone": "+966 50 000 0000",
+    "invoiceNumber": "INV-2025-0001",
+    "invoiceDate": "2025-04-19T10:30:00",
+    "cashierName": "Ahmed",
+    "tableNumber": "5",
+    "orderType": "Dine-in",
+    "items": [
+      {
+        "nameAr": "برجر",
+        "nameEn": "Burger",
+        "quantity": 2,
+        "unitPrice": 25.00,
+        "discount": 0,
+        "taxRate": 15,
+        "total": 50.00,
+        "notes": "No onions"
+      },
+      {
+        "nameAr": "بيبسي",
+        "nameEn": "Pepsi",
+        "quantity": 2,
+        "unitPrice": 5.00,
+        "discount": 0,
+        "taxRate": 15,
+        "total": 10.00
+      }
+    ],
+    "subTotal": 60.00,
+    "totalDiscount": 0,
+    "totalTax": 9.00,
+    "grandTotal": 69.00,
+    "paidAmount": 70.00,
+    "changeAmount": 1.00,
+    "paymentMethod": "Cash",
+    "footerMessage": "Visit us again!"
+  },
+  "copies": 1,
+  "openCashDrawer": false
+}

@@ -1,0 +1,159 @@
+<!doctype html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page {
+    size: {{paperWidth}}mm auto;
+    margin: {{marginTop}}mm {{marginRight}}mm {{marginBottom}}mm {{marginLeft}}mm;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    font-size: {{fontSizeMedium}}pt;
+    width: {{paperWidth}}mm;
+    direction: rtl;
+    color: #000;
+    background: #fff;
+    padding: 2mm 1mm;
+  }
+  @media screen {
+    body { border: 1px dashed #ccc; margin: 10px auto; }
+  }
+  .center { text-align: center; }
+  .left { text-align: left; direction: ltr; }
+
+  /* Header */
+  .company-ar { font-size: {{fontSizeLarge}}pt; font-weight: bold; margin-bottom: 2px; }
+  .company-en { font-size: {{fontSizeMedium}}pt; margin-bottom: 4px; }
+  .company-info { font-size: {{fontSizeSmall}}pt; color: #333; }
+
+  /* Separator */
+  .sep { border: none; border-top: 1px dashed #000; margin: 4px 0; }
+
+  /* Invoice Info */
+  .invoice-title { font-size: {{fontSizeMedium}}pt; font-weight: bold; margin: 4px 0; }
+  .info-row {
+    display: flex; justify-content: space-between;
+    font-size: {{fontSizeSmall}}pt; margin: 1px 0;
+  }
+  .info-label { color: #555; }
+  .info-value { font-weight: bold; }
+
+  /* Items */
+  .items-header {
+    display: flex; justify-content: space-between;
+    font-size: {{fontSizeSmall}}pt; font-weight: bold; margin: 2px 0;
+  }
+  .item-name { font-size: {{fontSizeSmall}}pt; margin: 2px 0; }
+  .item-detail {
+    display: flex; justify-content: space-between;
+    font-size: {{fontSizeSmall}}pt; color: #333; padding-right: 4px;
+  }
+  .item-notes { font-size: 7pt; color: #666; padding-right: 8px; margin-top: 1px; }
+
+  /* Totals */
+  .total-row {
+    display: flex; justify-content: space-between;
+    font-size: {{fontSizeMedium}}pt; margin: 1px 0;
+  }
+  .total-grand {
+    font-size: {{fontSizeLarge}}pt; font-weight: bold; margin: 2px 0;
+  }
+
+  /* Payment */
+  .payment-row {
+    display: flex; justify-content: space-between;
+    font-size: {{fontSizeSmall}}pt; margin: 1px 0;
+  }
+
+  /* QR */
+  .qr-section { text-align: center; margin: 6px 0; }
+  .qr-section img { width: {{qrCodeWidth}}px; height: {{qrCodeWidth}}px; }
+  .qr-label { font-size: 7pt; color: #555; margin-top: 2px; }
+
+  /* Footer */
+  .footer { font-size: {{fontSizeSmall}}pt; margin-top: 4px; }
+  .thank-you { font-size: {{fontSizeMedium}}pt; font-weight: bold; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<div class="center">
+  {{LogoHtml}}
+  <div class="company-ar">{{CompanyNameAr}}</div>
+  <div class="company-en">{{CompanyNameEn}}</div>
+  <div class="company-info">
+    VAT #: {{VatNumber}}<br>
+    CR #: {{CrNumber}}<br>
+    {{Address}}<br>
+    {{Phone}}
+  </div>
+</div>
+<hr class="sep">
+
+<div class="center invoice-title">TAX INVOICE</div>
+<hr class="sep">
+<div class="info-row">
+  <span class="info-label">Invoice #:</span>
+  <span class="info-value">{{InvoiceNumber}}</span>
+</div>
+<div class="info-row">
+  <span class="info-label">Date:</span>
+  <span class="info-value">{{InvoiceDate}}</span>
+</div>
+<div class="info-row">
+  <span class="info-label">Cashier:</span>
+  <span class="info-value">{{CashierName}}</span>
+</div>
+{{TableRow}}
+<hr class="sep">
+
+<div class="items-header">
+  <span>العنصر</span>
+  <span class="left">Item &nbsp; Qty x Price = Total</span>
+</div>
+<hr class="sep">
+
+{{ItemsHtml}}
+
+<hr class="sep">
+
+<div class="total-row">
+  <span>المجموع:</span>
+  <span class="left">Subtotal: {{SubTotal}}</span>
+</div>
+{{DiscountRow}}
+<div class="total-row">
+  <span>VAT 15%:</span>
+  <span class="left">{{TotalTax}}</span>
+</div>
+<hr class="sep">
+<div class="total-grand">
+  <span>الإجمالي:</span>
+  <span class="left">TOTAL: {{GrandTotal}} SAR</span>
+</div>
+<hr class="sep">
+
+<div class="payment-row">
+  <span>الدفع:</span>
+  <span class="left">{{PaymentMethod}}</span>
+</div>
+<div class="payment-row">
+  <span>المدفوع:</span>
+  <span class="left">{{PaidAmount}}</span>
+</div>
+{{ChangeRow}}
+<hr class="sep">
+
+<div class="qr-section">
+  {{QrCodeImg}}
+  <div class="qr-label">ZATCA QR Code</div>
+</div>
+<hr class="sep">
+
+<div class="center footer">{{FooterMessage}}</div>
+<div class="center thank-you">شكرا لزيارتكم</div>
+
+</body>
+</html>

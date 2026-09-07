@@ -1,0 +1,137 @@
+<!doctype html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<title>Cashier Receipt Preview</title>
+<style>
+  @page { size: 80mm auto; margin: 2mm 1mm 2mm 1mm; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    font-size: 10pt;
+    width: 80mm;
+    direction: rtl;
+    color: #000;
+    background: #fff;
+    padding: 2mm 1mm;
+  }
+  @media screen { body { border: 1px dashed #ccc; margin: 10px auto; } }
+  .center { text-align: center; }
+  .left { text-align: left; direction: ltr; }
+
+  .company-ar { font-size: 14pt; font-weight: bold; margin-bottom: 2px; }
+  .company-en { font-size: 11pt; margin-bottom: 4px; }
+  .company-info { font-size: 8pt; color: #333; }
+
+  .sep { border: none; border-top: 1px dashed #000; margin: 4px 0; }
+
+  .invoice-title { font-size: 11pt; font-weight: bold; margin: 4px 0; }
+  .info-row { display: flex; justify-content: space-between; font-size: 8pt; margin: 1px 0; }
+  .info-label { color: #555; }
+  .info-value { font-weight: bold; }
+
+  .items-header { display: flex; justify-content: space-between; font-size: 8pt; font-weight: bold; margin: 2px 0; }
+  .item-name { font-size: 8pt; margin: 2px 0; }
+  .item-detail { display: flex; justify-content: space-between; font-size: 8pt; color: #333; padding-right: 4px; }
+  .item-notes { font-size: 7pt; color: #666; padding-right: 8px; margin-top: 1px; }
+
+  .total-row { display: flex; justify-content: space-between; font-size: 10pt; margin: 1px 0; }
+  .total-grand { font-size: 13pt; font-weight: bold; margin: 2px 0; }
+
+  .payment-row { display: flex; justify-content: space-between; font-size: 8pt; margin: 1px 0; }
+
+  .qr-section { text-align: center; margin: 6px 0; }
+  .qr-section img { width: 80px; height: 80px; }
+  .qr-label { font-size: 7pt; color: #555; margin-top: 2px; }
+
+  .footer { font-size: 8pt; margin-top: 4px; }
+  .thank-you { font-size: 10pt; font-weight: bold; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<div class="center">
+  <div class="company-ar">شركة عريب</div>
+  <div class="company-en">Araib Group</div>
+  <div class="company-info">
+    VAT #: 300000000000003<br>
+    CR #: 1010000000<br>
+    Riyadh, Saudi Arabia<br>
+    Tel: +966 50 000 0000
+  </div>
+</div>
+<hr class="sep">
+
+<div class="center invoice-title">TAX INVOICE</div>
+<hr class="sep">
+<div class="info-row">
+  <span class="info-label">Invoice #:</span>
+  <span class="info-value">INV-2025-0001</span>
+</div>
+<div class="info-row">
+  <span class="info-label">Date:</span>
+  <span class="info-value">2025-04-19 10:30</span>
+</div>
+<div class="info-row">
+  <span class="info-label">Cashier:</span>
+  <span class="info-value">Ahmed</span>
+</div>
+<div class="info-row">
+  <span class="info-label">Table:</span>
+  <span class="info-value">5</span>
+</div>
+<hr class="sep">
+
+<div class="items-header">
+  <span>العنصر</span>
+  <span class="left">Item &nbsp; Qty x Price = Total</span>
+</div>
+<hr class="sep">
+
+<div class="item-name">برجر (Burger)</div>
+<div class="item-detail"><span class="left">2 x 25.00 = 50.00</span></div>
+
+<div class="item-name">بيبسي (Pepsi)</div>
+<div class="item-detail"><span class="left">2 x 5.00 = 10.00</span></div>
+<hr class="sep">
+
+<div class="total-row">
+  <span>المجموع:</span>
+  <span class="left">Subtotal: 60.00</span>
+</div>
+<div class="total-row">
+  <span>VAT 15%:</span>
+  <span class="left">9.00</span>
+</div>
+<hr class="sep">
+<div class="total-grand">
+  <span>الإجمالي:</span>
+  <span class="left">TOTAL: 69.00 SAR</span>
+</div>
+<hr class="sep">
+
+<div class="payment-row">
+  <span>الدفع:</span>
+  <span class="left">Payment: Cash</span>
+</div>
+<div class="payment-row">
+  <span>المدفوع:</span>
+  <span class="left">Paid: 70.00</span>
+</div>
+<div class="payment-row">
+  <span>الباقي:</span>
+  <span class="left">Change: 1.00</span>
+</div>
+<hr class="sep">
+
+<div class="qr-section">
+  <img src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=VGF4Q0EgUVIgQ29kZQ==" alt="QR Code">
+  <div class="qr-label">ZATCA QR Code</div>
+</div>
+<hr class="sep">
+
+<div class="center footer">Visit us again!</div>
+<div class="center thank-you">شكرا لزيارتكم</div>
+
+</body>
+</html>
