@@ -1,0 +1,88 @@
+<!doctype html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page {
+    size: 80mm auto;
+    margin: 2mm 1mm 2mm 1mm;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    font-size: 10pt;
+    width: 80mm;
+    direction: rtl;
+    color: #000;
+    background: #fff;
+    padding: 2mm 1mm;
+  }
+  @media screen {
+    body { border: 1px dashed #ccc; margin: 10px auto; }
+  }
+  .center { text-align: center; }
+
+  .kitchen-title {
+    font-size: 14pt;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 2px;
+  }
+  .kitchen-title-ar {
+    font-size: 10pt;
+    text-align: center;
+    margin-bottom: 4px;
+  }
+  .order-info { font-size: 10pt; margin: 2px 0; }
+  .table-num {
+    font-size: 20pt;
+    font-weight: bold;
+    text-align: center;
+    margin: 6px 0;
+    border: 2px solid #000;
+    padding: 4px;
+  }
+
+  .sep { border: none; border-top: 1px dashed #000; margin: 6px 0; }
+
+  .item {
+    font-size: 10pt;
+    font-weight: bold;
+    margin: 3px 0;
+  }
+  .item-notes {
+    font-size: 8pt;
+    color: #333;
+    padding-right: 12px;
+    margin-top: 1px;
+    font-style: italic;
+  }
+
+  .cashier { font-size: 8pt; margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<div class="kitchen-title">KITCHEN ORDER</div>
+<div class="kitchen-title-ar">أمر المطبخ</div>
+
+<div class="order-info">رقم الطلب: INV-2025-0001</div>
+<div class="order-info">الوقت: 16:53:35</div>
+
+<div class="table-num">الطاولة: 5</div>
+
+
+
+<hr class="sep">
+
+<div class="item">2 x برجر (Burger)</div>
+<div class="item-notes">&gt;&gt; No onions</div>
+<div class="item">2 x بيبسي (Pepsi)</div>
+
+
+<hr class="sep">
+
+<div class="cashier">الكاشير: Ahmed</div>
+
+</body>
+</html>
