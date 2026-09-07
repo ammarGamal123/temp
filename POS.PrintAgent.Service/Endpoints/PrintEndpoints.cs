@@ -275,10 +275,165 @@ public static class PrintEndpoints
         .WithSummary("Debug: raw raster bytes inspection")
         .WithDescription("Returns raw ESC/POS raster bytes with hex preview. Requires X-Api-Key.")
         ;
+
+        // ── Preview: PNG image ─────────────────────────────────────────
+        app.MapPost("/preview", async (
+            TestPrintRequest request,
+            IHtmlReceiptService htmlReceiptService) =>
+        {
+            if (string.IsNullOrEmpty(request.PrinterName))
+                return Results.BadRequest(new { message = "PrinterName is required" });
+
+            var testInvoice = CreateTestInvoice();
+            var printerConfig = request.PrinterConfig ?? new PrinterConfiguration
+            {
+                Name = request.PrinterName,
+                PaperWidth = 80,
+                Dpi = 203,
+                QrCodeSize = 80
+            };
+
+            try
+            {
+                var pngBytes = await htmlReceiptService.RenderReceiptPngAsync(testInvoice, printerConfig, Core.Enums.PrintJobType.Receipt);
+                return Results.Bytes(pngBytes, "image/png", "receipt-preview.png");
+            }
+            catch (Exception ex)
+            {
+                return Results.Ok(new { success = false, message = ex.Message });
+            }
+        })
+        .WithTags("Preview")
+        .WithSummary("Preview receipt as PNG image")
+        .WithDescription("Returns the rendered receipt as a PNG image you can view in the browser. Use jobType query param: 0=cashier, 1=kitchen. Requires X-Api-Key.")
+        ;
+
+        // ── Preview: kitchen PNG ───────────────────────────────────────
+        app.MapPost("/preview/kitchen", async (
+            TestPrintRequest request,
+            IHtmlReceiptService htmlReceiptService) =>
+        {
+            if (string.IsNullOrEmpty(request.PrinterName))
+                return Results.BadRequest(new { message = "PrinterName is required" });
+
+            var testInvoice = CreateTestInvoice();
+            var printerConfig = request.PrinterConfig ?? new PrinterConfiguration
+            {
+                Name = request.PrinterName,
+                PaperWidth = 80,
+                Dpi = 203,
+                QrCodeSize = 80
+            };
+
+            try
+            {
+                var pngBytes = await htmlReceiptService.RenderReceiptPngAsync(testInvoice, printerConfig, Core.Enums.PrintJobType.KitchenOrder);
+                return Results.Bytes(pngBytes, "image/png", "kitchen-preview.png");
+            }
+            catch (Exception ex)
+            {
+                return Results.Ok(new { success = false, message = ex.Message });
+            }
+        })
+        .WithTags("Preview")
+        .WithSummary("Preview kitchen order as PNG image")
+        .WithDescription("Returns the rendered kitchen order as a PNG image. Requires X-Api-Key.")
+        ;
+
+        // ── Preview: HTML (cashier) ────────────────────────────────────
+        app.MapPost("/preview/html", async (
+            TestPrintRequest request,
+            IHtmlReceiptService htmlReceiptService) =>
+        {
+            if (string.IsNullOrEmpty(request.PrinterName))
+                return Results.BadRequest(new { message = "PrinterName is required" });
+
+            var testInvoice = CreateTestInvoice();
+            var printerConfig = request.PrinterConfig ?? new PrinterConfiguration
+            {
+                Name = request.PrinterName,
+                PaperWidth = 80,
+                Dpi = 203,
+                QrCodeSize = 80
+            };
+
+            try
+            {
+                var html = await htmlReceiptService.RenderReceiptHtmlAsync(testInvoice, printerConfig, Core.Enums.PrintJobType.Receipt);
+                return Results.Content(html, "text/html; charset=utf-8");
+            }
+            catch (Exception ex)
+            {
+                return Results.Ok(new { success = false, message = ex.Message });
+            }
+        })
+        .WithTags("Preview")
+        .WithSummary("Preview cashier receipt as HTML")
+        .WithDescription("Returns the hydrated HTML for the cashier receipt. Open in browser to inspect layout, CSS, Arabic text, and QR code. Requires X-Api-Key.")
+        ;
+
+        // ── Preview: HTML (kitchen) ────────────────────────────────────
+        app.MapPost("/preview/html/kitchen", async (
+            TestPrintRequest request,
+            IHtmlReceiptService htmlReceiptService) =>
+        {
+            if (string.IsNullOrEmpty(request.PrinterName))
+                return Results.BadRequest(new { message = "PrinterName is required" });
+
+            var testInvoice = CreateTestInvoice();
+            var printerConfig = request.PrinterConfig ?? new PrinterConfiguration
+            {
+                Name = request.PrinterName,
+                PaperWidth = 80,
+                Dpi = 203,
+                QrCodeSize = 80
+            };
+
+            try
+            {
+                var html = await htmlReceiptService.RenderReceiptHtmlAsync(testInvoice, printerConfig, Core.Enums.PrintJobType.KitchenOrder);
+                return Results.Content(html, "text/html; charset=utf-8");
+            }
+            catch (Exception ex)
+            {
+                return Results.Ok(new { success = false, message = ex.Message });
+            }
+        })
+        .WithTags("Preview")
+        .WithSummary("Preview kitchen order as HTML")
+        .WithDescription("Returns the hydrated HTML for the kitchen order. Open in browser to inspect layout. Requires X-Api-Key.")
+        ;
     }
 
     public record OpenDrawerRequest(string PrinterName);
     public record TestPrintRequest(string PrinterName, PrinterConfiguration? PrinterConfig);
+
+    private static InvoiceData CreateTestInvoice() => new()
+    {
+        CompanyNameAr = "شركة عريب",
+        CompanyNameEn = "Araib Group",
+        VatNumber = "300000000000003",
+        CrNumber = "1010000000",
+        Address = "Riyadh, Saudi Arabia",
+        Phone = "+966 50 000 0000",
+        InvoiceNumber = "INV-2025-0001",
+        InvoiceDate = DateTime.Now,
+        CashierName = "Ahmed",
+        TableNumber = "5",
+        Items = new List<InvoiceItem>
+        {
+            new() { NameAr = "برجر", NameEn = "Burger", Quantity = 2, UnitPrice = 25, Total = 50, Notes = "No onions" },
+            new() { NameAr = "بيبسي", NameEn = "Pepsi", Quantity = 2, UnitPrice = 5, Total = 10 }
+        },
+        SubTotal = 60,
+        TotalTax = 9,
+        GrandTotal = 69,
+        PaidAmount = 70,
+        ChangeAmount = 1,
+        PaymentMethod = "Cash",
+        QrCodeBase64 = "VATCA QR Code Test Data",
+        FooterMessage = "Visit us again!"
+    };
 }
 
 // المشكله دي بتحصل في كل انواع الطابعات ؟ اه

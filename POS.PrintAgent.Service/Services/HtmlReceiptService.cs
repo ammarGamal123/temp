@@ -13,6 +13,8 @@ namespace POS.PrintAgent.Service.Services;
 public interface IHtmlReceiptService
 {
     Task<byte[]> RenderReceiptAsync(InvoiceData invoice, PrinterConfiguration config, PrintJobType jobType, CancellationToken ct = default);
+    Task<byte[]> RenderReceiptPngAsync(InvoiceData invoice, PrinterConfiguration config, PrintJobType jobType, CancellationToken ct = default);
+    Task<string> RenderReceiptHtmlAsync(InvoiceData invoice, PrinterConfiguration config, PrintJobType jobType, CancellationToken ct = default);
 }
 
 [SupportedOSPlatform("windows")]
@@ -41,6 +43,21 @@ public class HtmlReceiptService : IHtmlReceiptService
     public async Task<byte[]> RenderReceiptAsync(
         InvoiceData invoice, PrinterConfiguration config, PrintJobType jobType, CancellationToken ct = default)
     {
+        var html = await RenderReceiptHtmlAsync(invoice, config, jobType, ct);
+        var pngData = await RenderHtmlToPngAsync(html, config, ct);
+        return EscapeGSImageHelper.ConvertPngToEscPosRaster(pngData, config.PaperWidth, config.Dpi);
+    }
+
+    public async Task<byte[]> RenderReceiptPngAsync(
+        InvoiceData invoice, PrinterConfiguration config, PrintJobType jobType, CancellationToken ct = default)
+    {
+        var html = await RenderReceiptHtmlAsync(invoice, config, jobType, ct);
+        return await RenderHtmlToPngAsync(html, config, ct);
+    }
+
+    public async Task<string> RenderReceiptHtmlAsync(
+        InvoiceData invoice, PrinterConfiguration config, PrintJobType jobType, CancellationToken ct = default)
+    {
         var templateFile = jobType switch
         {
             PrintJobType.Receipt => "receipt-cashier.html",
@@ -57,9 +74,7 @@ public class HtmlReceiptService : IHtmlReceiptService
 
         _logger.LogDebug("Hydrated HTML length: {Length} chars for {JobType}", html.Length, jobType);
 
-        var pngData = await RenderHtmlToPngAsync(html, config, ct);
-
-        return EscapeGSImageHelper.ConvertPngToEscPosRaster(pngData, config.PaperWidth, config.Dpi);
+        return html;
     }
 
     private string LoadTemplate(string path)
