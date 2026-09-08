@@ -1,6 +1,4 @@
 using System.Text.Json;
-using System.Drawing;
-using System.Drawing.Printing;
 using POS.PrintAgent.Core.Enums;
 using POS.PrintAgent.Core.Interfaces;
 using POS.PrintAgent.Core.Models;
@@ -20,7 +18,7 @@ public static class PrintEndpoints
         {
             status = "healthy",
             timestamp = DateTime.UtcNow,
-            version = "1.3.0"
+            version = "1.4.0"
         }))
         .WithTags("Health")
         .WithSummary("Health check")
@@ -125,7 +123,7 @@ public static class PrintEndpoints
 
             try
             {
-                var useRawEscPos = ShouldUseRawEscPos(cfg);
+                var useRawEscPos = PrintRouter.ResolvePrintPath(cfg) == PrintRouter.RawEscPos;
                 if (useRawEscPos)
                 {
                     var bytes = await htmlReceiptService.RenderRawHtmlAsync(request.Html, cfg, ct);
@@ -148,7 +146,7 @@ public static class PrintEndpoints
                 {
                     var pngBytes = await htmlReceiptService.RenderRawHtmlPngAsync(request.Html, cfg, ct);
                     var success = await Task.Run(
-                        () => PrintPngUsingWindowsDriver(request.PrinterName, pngBytes, copies),
+                        () => PrintRouter.PrintPngUsingWindowsDriver(request.PrinterName, pngBytes, copies, cfg),
                         ct
                     );
                     if (!success)
@@ -157,8 +155,17 @@ public static class PrintEndpoints
 
                 if (request.OpenCashDrawer)
                 {
-                    var drawerBytes = new byte[] { 0x1B, 0x70, 0x00, 0x19, 0xFA };
-                    RawPrinterHelper.SendBytesToPrinter(request.PrinterName, drawerBytes);
+                    if (useRawEscPos)
+                    {
+                        var drawerBytes = new byte[] { 0x1B, 0x70, 0x00, 0x19, 0xFA };
+                        RawPrinterHelper.SendBytesToPrinter(request.PrinterName, drawerBytes);
+                    }
+                    else
+                    {
+                        logger.LogInformation(
+                            "Cash drawer kick skipped on driver path for printer {Printer} (no drawer on this path)",
+                            request.PrinterName);
+                    }
                 }
 
                 var jobId = Guid.NewGuid().ToString("N")[..8];
@@ -515,59 +522,6 @@ public static class PrintEndpoints
         int Copies = 1,
         bool OpenCashDrawer = false
     );
-
-    private static bool ShouldUseRawEscPos(PrinterConfiguration cfg)
-    {
-        var printerType = (cfg.PrinterType ?? string.Empty).Trim().ToLowerInvariant();
-        if (printerType == "a4") return false;
-        if (cfg.PaperWidth >= 120) return false;
-        return true;
-    }
-
-    private static bool PrintPngUsingWindowsDriver(string printerName, byte[] pngBytes, int copies)
-    {
-        using var ms = new MemoryStream(pngBytes);
-        using var image = Image.FromStream(ms);
-        var ok = true;
-
-        for (var i = 0; i < Math.Max(copies, 1); i++)
-        {
-            using var doc = new PrintDocument
-            {
-                PrintController = new StandardPrintController()
-            };
-            doc.PrinterSettings.PrinterName = printerName;
-            if (!doc.PrinterSettings.IsValid) return false;
-            doc.DefaultPageSettings.Margins = new Margins(0, 0, 0, 0);
-            doc.PrintPage += (_, e) =>
-            {
-                var bounds = e.MarginBounds;
-                if (bounds.Width <= 0 || bounds.Height <= 0) bounds = e.PageBounds;
-
-                var ratio = Math.Min(
-                    bounds.Width / (float)image.Width,
-                    bounds.Height / (float)image.Height
-                );
-                var drawWidth = Math.Max(1, (int)(image.Width * ratio));
-                var drawHeight = Math.Max(1, (int)(image.Height * ratio));
-                var x = bounds.Left + ((bounds.Width - drawWidth) / 2);
-                var y = bounds.Top;
-                e.Graphics?.DrawImage(image, x, y, drawWidth, drawHeight);
-                e.HasMorePages = false;
-            };
-            try
-            {
-                doc.Print();
-            }
-            catch
-            {
-                ok = false;
-                break;
-            }
-        }
-
-        return ok;
-    }
 
     private static InvoiceData CreateTestInvoice() => new()
     {

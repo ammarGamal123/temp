@@ -100,6 +100,7 @@ public static class FlexibleRequestParser
                 {
                     Name = GetString(pcEl, "name", "Name", "printerName") ?? printerName,
                     PrinterType = GetString(pcEl, "printerType", "PrinterType", "type") ?? "thermal",
+                    PrintMode = GetString(pcEl, "printMode", "PrintMode", "mode") ?? "auto",
                     PaperWidth = GetInt(pcEl, "paperWidth", "PaperWidth") ?? 80,
                     PaperHeight = GetInt(pcEl, "paperHeight", "PaperHeight") ?? 200,
                     Dpi = GetInt(pcEl, "dpi", "Dpi") ?? 203,
