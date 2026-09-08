@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Drawing;
+using System.Drawing.Printing;
 using POS.PrintAgent.Core.Enums;
 using POS.PrintAgent.Core.Interfaces;
 using POS.PrintAgent.Core.Models;
@@ -18,7 +20,7 @@ public static class PrintEndpoints
         {
             status = "healthy",
             timestamp = DateTime.UtcNow,
-            version = "1.2.0"
+            version = "1.3.0"
         }))
         .WithTags("Health")
         .WithSummary("Health check")
@@ -123,20 +125,34 @@ public static class PrintEndpoints
 
             try
             {
-                var bytes = await htmlReceiptService.RenderRawHtmlAsync(request.Html, cfg, ct);
-                var cutCommand = new byte[] { 0x1D, 0x56, 0x00 };
-                var bytesWithCut = new byte[bytes.Length + cutCommand.Length];
-                Buffer.BlockCopy(bytes, 0, bytesWithCut, 0, bytes.Length);
-                Buffer.BlockCopy(cutCommand, 0, bytesWithCut, bytes.Length, cutCommand.Length);
-
-                for (var i = 0; i < copies; i++)
+                var useRawEscPos = ShouldUseRawEscPos(cfg);
+                if (useRawEscPos)
                 {
+                    var bytes = await htmlReceiptService.RenderRawHtmlAsync(request.Html, cfg, ct);
+                    var cutCommand = new byte[] { 0x1D, 0x56, 0x00 };
+                    var bytesWithCut = new byte[bytes.Length + cutCommand.Length];
+                    Buffer.BlockCopy(bytes, 0, bytesWithCut, 0, bytes.Length);
+                    Buffer.BlockCopy(cutCommand, 0, bytesWithCut, bytes.Length, cutCommand.Length);
+
+                    for (var i = 0; i < copies; i++)
+                    {
+                        var success = await Task.Run(
+                            () => RawPrinterHelper.SendBytesToPrinter(request.PrinterName, bytesWithCut),
+                            ct
+                        );
+                        if (!success)
+                            return Results.Problem($"Failed to send raw data to printer '{request.PrinterName}'");
+                    }
+                }
+                else
+                {
+                    var pngBytes = await htmlReceiptService.RenderRawHtmlPngAsync(request.Html, cfg, ct);
                     var success = await Task.Run(
-                        () => RawPrinterHelper.SendBytesToPrinter(request.PrinterName, bytesWithCut),
+                        () => PrintPngUsingWindowsDriver(request.PrinterName, pngBytes, copies),
                         ct
                     );
                     if (!success)
-                        return Results.Problem($"Failed to send data to printer '{request.PrinterName}'");
+                        return Results.Problem($"Failed to print HTML image on printer '{request.PrinterName}'");
                 }
 
                 if (request.OpenCashDrawer)
@@ -147,10 +163,11 @@ public static class PrintEndpoints
 
                 var jobId = Guid.NewGuid().ToString("N")[..8];
                 logger.LogInformation(
-                    "HTML print job {JobId} completed. Printer: {Printer}, JobType: {JobType}",
+                    "HTML print job {JobId} completed. Printer: {Printer}, JobType: {JobType}, Path: {Path}",
                     jobId,
                     request.PrinterName,
-                    jobType
+                    jobType,
+                    useRawEscPos ? "raw-escpos" : "windows-driver"
                 );
 
                 return Results.Ok(new PrintResponse
@@ -498,6 +515,59 @@ public static class PrintEndpoints
         int Copies = 1,
         bool OpenCashDrawer = false
     );
+
+    private static bool ShouldUseRawEscPos(PrinterConfiguration cfg)
+    {
+        var printerType = (cfg.PrinterType ?? string.Empty).Trim().ToLowerInvariant();
+        if (printerType == "a4") return false;
+        if (cfg.PaperWidth >= 120) return false;
+        return true;
+    }
+
+    private static bool PrintPngUsingWindowsDriver(string printerName, byte[] pngBytes, int copies)
+    {
+        using var ms = new MemoryStream(pngBytes);
+        using var image = Image.FromStream(ms);
+        var ok = true;
+
+        for (var i = 0; i < Math.Max(copies, 1); i++)
+        {
+            using var doc = new PrintDocument
+            {
+                PrintController = new StandardPrintController()
+            };
+            doc.PrinterSettings.PrinterName = printerName;
+            if (!doc.PrinterSettings.IsValid) return false;
+            doc.DefaultPageSettings.Margins = new Margins(0, 0, 0, 0);
+            doc.PrintPage += (_, e) =>
+            {
+                var bounds = e.MarginBounds;
+                if (bounds.Width <= 0 || bounds.Height <= 0) bounds = e.PageBounds;
+
+                var ratio = Math.Min(
+                    bounds.Width / (float)image.Width,
+                    bounds.Height / (float)image.Height
+                );
+                var drawWidth = Math.Max(1, (int)(image.Width * ratio));
+                var drawHeight = Math.Max(1, (int)(image.Height * ratio));
+                var x = bounds.Left + ((bounds.Width - drawWidth) / 2);
+                var y = bounds.Top;
+                e.Graphics?.DrawImage(image, x, y, drawWidth, drawHeight);
+                e.HasMorePages = false;
+            };
+            try
+            {
+                doc.Print();
+            }
+            catch
+            {
+                ok = false;
+                break;
+            }
+        }
+
+        return ok;
+    }
 
     private static InvoiceData CreateTestInvoice() => new()
     {
