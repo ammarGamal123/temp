@@ -92,7 +92,8 @@ public class ThermalReceiptBuilder : IReceiptBuilder
         Write(ms, EscPosCommands.BoldOn);
         foreach (var item in invoice.Items)
         {
-            WriteText(ms, $"{item.Quantity:0} x {item.NameEn}");
+            var displayName = !string.IsNullOrWhiteSpace(item.NameAr) ? item.NameAr : item.NameEn;
+            WriteText(ms, $"{item.Quantity:0} x {displayName}");
             Write(ms, EscPosCommands.NewLine);
 
             if (!string.IsNullOrEmpty(item.Notes))
@@ -140,13 +141,10 @@ public class ThermalReceiptBuilder : IReceiptBuilder
 
     private void SetFontSize(MemoryStream ms, int pointSize)
     {
-        var mapped = PrinterConfigMapper.MapFontSize(pointSize);
-        Write(ms, new byte[] { EscPosCommands.GS, (byte)'!', mapped.ToEscPosByte() });
     }
 
     private void ResetFontSize(MemoryStream ms)
     {
-        Write(ms, EscPosCommands.NormalSize);
     }
 
     #endregion
@@ -161,19 +159,16 @@ public class ThermalReceiptBuilder : IReceiptBuilder
         Write(ms, EscPosCommands.BoldOn);
         if (!string.IsNullOrEmpty(invoice.CompanyNameAr))
         {
-            WriteArabic(ms, invoice.CompanyNameAr);
+            WriteText(ms, invoice.CompanyNameAr);
             Write(ms, EscPosCommands.NewLine);
         }
-        ResetFontSize(ms);
-        Write(ms, EscPosCommands.BoldOff);
-
-        if (!string.IsNullOrEmpty(invoice.CompanyNameEn))
+        if (!string.IsNullOrEmpty(invoice.CompanyNameEn) &&
+            !string.Equals(invoice.CompanyNameEn, invoice.CompanyNameAr, StringComparison.OrdinalIgnoreCase))
         {
-            SetFontSize(ms, _config.FontSizeMedium);
             WriteText(ms, invoice.CompanyNameEn);
             Write(ms, EscPosCommands.NewLine);
-            ResetFontSize(ms);
         }
+        Write(ms, EscPosCommands.BoldOff);
 
         SetFontSize(ms, _config.FontSizeSmall);
         if (!string.IsNullOrEmpty(invoice.VatNumber))
@@ -247,7 +242,8 @@ public class ThermalReceiptBuilder : IReceiptBuilder
 
         foreach (var item in invoice.Items)
         {
-            var name = ArabicTextHelper.Truncate(item.NameEn, _width - 2);
+            var displayName = !string.IsNullOrWhiteSpace(item.NameAr) ? item.NameAr : item.NameEn;
+            var name = ArabicTextHelper.Truncate(displayName, _width - 2);
             WriteText(ms, LeftMargin + name);
             Write(ms, EscPosCommands.NewLine);
 
@@ -322,18 +318,11 @@ public class ThermalReceiptBuilder : IReceiptBuilder
     {
         Write(ms, EscPosCommands.AlignCenter);
 
-        var qrSize = PrinterConfigMapper.MapQrSize(_config.QrCodeSize);
-        var qrBytes = GenerateQrCodeBytes(qrData, qrSize);
-        if (qrBytes != null)
-        {
-            Write(ms, qrBytes);
-            Write(ms, EscPosCommands.NewLine);
-        }
+        WriteText(ms, $"[QR: {qrData}]");
+        Write(ms, EscPosCommands.NewLine);
 
-        SetFontSize(ms, _config.FontSizeSmall);
         WriteText(ms, "ZATCA QR Code");
         Write(ms, EscPosCommands.NewLine);
-        ResetFontSize(ms);
     }
 
     private byte[]? GenerateQrCodeBytes(string data, byte moduleSize)
@@ -389,14 +378,13 @@ public class ThermalReceiptBuilder : IReceiptBuilder
 
     private static void WriteText(MemoryStream ms, string text)
     {
-        var bytes = Encoding.ASCII.GetBytes(text);
+        var bytes = ArabicTextHelper.EncodeArabic(text ?? string.Empty);
         ms.Write(bytes, 0, bytes.Length);
     }
 
     private static void WriteArabic(MemoryStream ms, string text)
     {
-        var bytes = ArabicTextHelper.EncodeArabic(text);
-        ms.Write(bytes, 0, bytes.Length);
+        WriteText(ms, text);
     }
 
     private void WriteSeparator(MemoryStream ms)

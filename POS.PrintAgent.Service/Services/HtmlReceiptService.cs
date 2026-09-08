@@ -15,6 +15,7 @@ public interface IHtmlReceiptService
     Task<byte[]> RenderReceiptAsync(InvoiceData invoice, PrinterConfiguration config, PrintJobType jobType, CancellationToken ct = default);
     Task<byte[]> RenderReceiptPngAsync(InvoiceData invoice, PrinterConfiguration config, PrintJobType jobType, CancellationToken ct = default);
     Task<string> RenderReceiptHtmlAsync(InvoiceData invoice, PrinterConfiguration config, PrintJobType jobType, CancellationToken ct = default);
+    Task<byte[]> RenderRawHtmlAsync(string html, PrinterConfiguration config, CancellationToken ct = default);
 }
 
 [SupportedOSPlatform("windows")]
@@ -75,6 +76,15 @@ public class HtmlReceiptService : IHtmlReceiptService
         _logger.LogDebug("Hydrated HTML length: {Length} chars for {JobType}", html.Length, jobType);
 
         return html;
+    }
+
+    public async Task<byte[]> RenderRawHtmlAsync(string html, PrinterConfiguration config, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(html))
+            throw new ArgumentException("HTML content is required", nameof(html));
+
+        var pngData = await RenderHtmlToPngAsync(html, config, ct);
+        return EscapeGSImageHelper.ConvertPngToEscPosRaster(pngData, config.PaperWidth, config.Dpi);
     }
 
     private string LoadTemplate(string path)

@@ -128,16 +128,16 @@ public static class FlexibleRequestParser
                 // Company names: support companyName -> both Ar/En
                 var companyNameAr = GetString(invEl, "companyNameAr", "CompanyNameAr");
                 var companyNameEn = GetString(invEl, "companyNameEn", "CompanyNameEn");
-                var companyNameGeneric = GetString(invEl, "companyName", "CompanyName", "company", "storeName");
+                var companyNameGeneric = GetString(invEl, "companyName", "CompanyName", "company", "storeName", "businessName");
                 if (string.IsNullOrEmpty(companyNameAr) && !string.IsNullOrEmpty(companyNameGeneric))
                     companyNameAr = companyNameGeneric;
                 if (string.IsNullOrEmpty(companyNameEn) && !string.IsNullOrEmpty(companyNameGeneric))
                     companyNameEn = companyNameGeneric;
 
-                var vatNumber = GetString(invEl, "vatNumber", "VatNumber", "companyVatNumber", "CompanyVatNumber", "vat", "taxNumber") ?? string.Empty;
+                var vatNumber = GetString(invEl, "vatNumber", "VatNumber", "companyVatNumber", "CompanyVatNumber", "businessVatNumber", "vat", "taxNumber") ?? string.Empty;
                 var crNumber = GetString(invEl, "crNumber", "CrNumber", "cr", "commercialRegister") ?? string.Empty;
-                var address = GetString(invEl, "address", "Address") ?? string.Empty;
-                var phone = GetString(invEl, "phone", "Phone", "tel", "telephone") ?? string.Empty;
+                var address = GetString(invEl, "address", "Address", "companyAddress", "businessAddress") ?? string.Empty;
+                var phone = GetString(invEl, "phone", "Phone", "tel", "telephone", "companyPhone", "phoneNumber") ?? string.Empty;
                 var logoBase64 = GetString(invEl, "logoBase64", "LogoBase64", "logo");
 
                 var invoiceNumber = GetString(invEl, "invoiceNumber", "InvoiceNumber", "invoiceNo", "number", "orderNumber") ?? string.Empty;
@@ -147,9 +147,9 @@ public static class FlexibleRequestParser
                     invoiceNumber = GetString(invEl, "orderNumber", "OrderNumber") ?? string.Empty;
 
                 var invoiceDate = GetDateTime(invEl, "invoiceDate", "InvoiceDate", "createdAt", "CreatedAt", "date", "Date", "created_at", "timestamp") ?? DateTime.Now;
-                var cashierName = GetString(invEl, "cashierName", "CashierName", "cashier", "userName") ?? "Cashier";
+                var cashierName = GetString(invEl, "cashierName", "CashierName", "cashier", "userName", "registerName") ?? "Cashier";
                 var tableNumber = GetString(invEl, "tableNumber", "TableNumber", "table");
-                var orderType = GetString(invEl, "orderType", "OrderType", "type");
+                var orderType = GetString(invEl, "orderType", "OrderType", "invoiceType", "type");
 
                 // Items: support both items and details/lines
                 List<InvoiceItem> items = new();  // we will check if support both items and details
@@ -185,7 +185,12 @@ public static class FlexibleRequestParser
                         }
                         taxRate ??= 15;
 
-                        var total = GetDecimal(it, "total", "Total", "lineTotal", "LineTotal", "amount", "Amount", "line_total", "subtotal") ?? 0;
+                        var total = GetDecimal(it, "total", "Total", "lineTotal", "LineTotal", "totalWithTax", "TotalWithTax", "amount", "Amount", "line_total", "subtotal") ?? 0;
+                        if (total <= 0)
+                        {
+                            var estimated = (unitPrice * quantity) - discount;
+                            total = estimated > 0 ? estimated : 0;
+                        }
                         var notes = GetString(it, "notes", "Notes", "note", "Note", "remark", "description") ?? string.Empty;
                         var categoryName = GetString(it, "categoryName", "CategoryName", "category");
 
@@ -234,9 +239,25 @@ public static class FlexibleRequestParser
                         changeAmount = 0;
                 }
 
-                var paymentMethod = GetString(invEl, "paymentMethod", "PaymentMethod", "payment", "payMethod") ?? "Cash";
-                var qrCodeBase64 = GetString(invEl, "qrCodeBase64", "QrCodeBase64", "qrCode", "zatcaQr", "qr");
-                var footerMessage = GetString(invEl, "footerMessage", "FooterMessage", "footer", "notes");
+                string paymentMethod = GetString(invEl, "paymentMethod", "PaymentMethod", "payment", "payMethod") ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(paymentMethod) &&
+                    TryGet(invEl, out var pmArrayEl, "paymentMethods", "PaymentMethods") &&
+                    pmArrayEl.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var pm in pmArrayEl.EnumerateArray())
+                    {
+                        if (pm.ValueKind != JsonValueKind.Object) continue;
+                        paymentMethod =
+                            GetString(pm, "paymentMethodType", "PaymentMethodType", "type", "name", "paymentMethodName") ??
+                            string.Empty;
+                        if (!string.IsNullOrWhiteSpace(paymentMethod)) break;
+                    }
+                }
+                if (string.IsNullOrWhiteSpace(paymentMethod))
+                    paymentMethod = "Cash";
+
+                var qrCodeBase64 = GetString(invEl, "qrCodeBase64", "QrCodeBase64", "qrCode", "zatcaQr", "zatcaQrCode", "qrImageBase64", "qr");
+                var footerMessage = GetString(invEl, "footerMessage", "FooterMessage", "footer", "notes", "statement", "invoiceStatement");
                 var customerName = GetString(invEl, "customerName", "CustomerName", "customer", "clientName");
                 var customerPhone = GetString(invEl, "customerPhone", "CustomerPhone", "customer_phone", "phoneNumber");
 

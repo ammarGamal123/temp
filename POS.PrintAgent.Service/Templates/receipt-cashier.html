@@ -5,23 +5,25 @@
 <style>
   @page {
     size: {{paperWidth}}mm auto;
-    margin: {{marginTop}}mm {{marginRight}}mm {{marginBottom}}mm {{marginLeft}}mm;
+    margin: 0;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
-    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    font-family: 'Cairo', 'Noto Naskh Arabic', 'Segoe UI', Tahoma, Arial, sans-serif;
     font-size: {{fontSizeMedium}}pt;
-    width: {{paperWidth}}mm;
+    width: 100%;
+    max-width: 100%;
     direction: rtl;
     color: #000;
     background: #fff;
-    padding: 2mm 1mm;
+    padding: {{marginTop}}mm {{marginRight}}mm {{marginBottom}}mm {{marginLeft}}mm;
+    line-height: 1.4;
   }
   @media screen {
     body { border: 1px dashed #ccc; margin: 10px auto; }
   }
   .center { text-align: center; }
-  .left { text-align: left; direction: ltr; }
+  .left { text-align: left; direction: ltr; white-space: nowrap; }
 
   /* Header */
   .company-ar { font-size: {{fontSizeLarge}}pt; font-weight: bold; margin-bottom: 2px; }
@@ -45,10 +47,10 @@
     display: flex; justify-content: space-between;
     font-size: {{fontSizeSmall}}pt; font-weight: bold; margin: 2px 0;
   }
-  .item-name { font-size: {{fontSizeSmall}}pt; margin: 2px 0; }
+  .item-name { font-size: {{fontSizeSmall}}pt; margin: 2px 0; font-weight: 600; word-break: break-word; }
   .item-detail {
     display: flex; justify-content: space-between;
-    font-size: {{fontSizeSmall}}pt; color: #333; padding-right: 4px;
+    font-size: {{fontSizeSmall}}pt; color: #333; padding-right: 4px; direction: ltr;
   }
   .item-notes { font-size: 7pt; color: #666; padding-right: 8px; margin-top: 1px; }
 
@@ -58,6 +60,7 @@
     font-size: {{fontSizeMedium}}pt; margin: 1px 0;
   }
   .total-grand {
+    display: flex; justify-content: space-between;
     font-size: {{fontSizeLarge}}pt; font-weight: bold; margin: 2px 0;
   }
 

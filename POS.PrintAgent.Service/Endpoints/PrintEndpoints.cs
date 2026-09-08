@@ -1,4 +1,5 @@
 using System.Text.Json;
+using POS.PrintAgent.Core.Enums;
 using POS.PrintAgent.Core.Interfaces;
 using POS.PrintAgent.Core.Models;
 using POS.PrintAgent.Service.Services;
@@ -17,7 +18,7 @@ public static class PrintEndpoints
         {
             status = "healthy",
             timestamp = DateTime.UtcNow,
-            version = "1.1.0"
+            version = "1.2.0"
         }))
         .WithTags("Health")
         .WithSummary("Health check")
@@ -88,6 +89,88 @@ public static class PrintEndpoints
         .WithTags("Printing")
         .WithSummary("Print receipt/invoice (flexible)")
         .WithDescription("Accepts BOTH canonical (invoice.items / nameEn / total) and legacy frontend (invoice.details / productName / lineTotal). PrinterConfig is per-request. Requires X-Api-Key. See docs/sample-print-request.json and docs/FRONTEND_FIX_400.md.")
+        ;
+
+        // Print endpoint (raw frontend HTML) for silent printing with frontend design fidelity.
+        app.MapPost("/print/html", async (
+            HtmlPrintRequest request,
+            IHtmlReceiptService htmlReceiptService,
+            IPrinterService printerService,
+            ILoggerFactory loggerFactory,
+            CancellationToken ct) =>
+        {
+            var logger = loggerFactory.CreateLogger("PrintEndpoints");
+
+            if (string.IsNullOrWhiteSpace(request.PrinterName))
+                return Results.BadRequest(new { message = "PrinterName is required" });
+
+            if (string.IsNullOrWhiteSpace(request.Html))
+                return Results.BadRequest(new { message = "HTML is required" });
+
+            var installed = printerService.GetAvailablePrinters()
+                .Any(p => string.Equals(p.Name, request.PrinterName, StringComparison.OrdinalIgnoreCase));
+            if (!installed)
+                return Results.BadRequest(new { message = $"Printer '{request.PrinterName}' not found" });
+
+            var cfg = request.PrinterConfig ?? new PrinterConfiguration { Name = request.PrinterName };
+            if (string.IsNullOrWhiteSpace(cfg.Name))
+                cfg.Name = request.PrinterName;
+
+            var copies = request.Copies <= 0 ? 1 : request.Copies;
+            var jobType = Enum.IsDefined(typeof(PrintJobType), request.JobType)
+                ? (PrintJobType)request.JobType
+                : PrintJobType.KitchenOrder;
+
+            try
+            {
+                var bytes = await htmlReceiptService.RenderRawHtmlAsync(request.Html, cfg, ct);
+                var cutCommand = new byte[] { 0x1D, 0x56, 0x00 };
+                var bytesWithCut = new byte[bytes.Length + cutCommand.Length];
+                Buffer.BlockCopy(bytes, 0, bytesWithCut, 0, bytes.Length);
+                Buffer.BlockCopy(cutCommand, 0, bytesWithCut, bytes.Length, cutCommand.Length);
+
+                for (var i = 0; i < copies; i++)
+                {
+                    var success = await Task.Run(
+                        () => RawPrinterHelper.SendBytesToPrinter(request.PrinterName, bytesWithCut),
+                        ct
+                    );
+                    if (!success)
+                        return Results.Problem($"Failed to send data to printer '{request.PrinterName}'");
+                }
+
+                if (request.OpenCashDrawer)
+                {
+                    var drawerBytes = new byte[] { 0x1B, 0x70, 0x00, 0x19, 0xFA };
+                    RawPrinterHelper.SendBytesToPrinter(request.PrinterName, drawerBytes);
+                }
+
+                var jobId = Guid.NewGuid().ToString("N")[..8];
+                logger.LogInformation(
+                    "HTML print job {JobId} completed. Printer: {Printer}, JobType: {JobType}",
+                    jobId,
+                    request.PrinterName,
+                    jobType
+                );
+
+                return Results.Ok(new PrintResponse
+                {
+                    Success = true,
+                    Message = "Print job sent successfully",
+                    JobId = jobId,
+                    RenderMode = "html-direct",
+                    FallbackUsed = false
+                });
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "HTML print failed for printer {Printer}", request.PrinterName);
+                return Results.Problem($"HTML print error: {ex.Message}");
+            }
+        })
+        .WithTags("Printing")
+        .WithSummary("Print raw HTML silently")
+        .WithDescription("Renders provided HTML via PuppeteerSharp then sends raster data to printer silently. Requires X-Api-Key.")
         ;
 
         // Open cash drawer
@@ -407,6 +490,14 @@ public static class PrintEndpoints
 
     public record OpenDrawerRequest(string PrinterName);
     public record TestPrintRequest(string PrinterName, PrinterConfiguration? PrinterConfig);
+    public record HtmlPrintRequest(
+        string PrinterName,
+        string Html,
+        PrinterConfiguration? PrinterConfig,
+        int JobType = 1,
+        int Copies = 1,
+        bool OpenCashDrawer = false
+    );
 
     private static InvoiceData CreateTestInvoice() => new()
     {

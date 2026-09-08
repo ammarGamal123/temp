@@ -49,6 +49,8 @@ public class WindowsPrinterService : IPrinterService
             _builder.Configure(request.PrinterConfig);
 
             byte[] bytes;
+            var renderModeUsed = "escpos";
+            var fallbackUsed = false;
 
             if (_rendererMode == "html")
             {
@@ -65,6 +67,7 @@ public class WindowsPrinterService : IPrinterService
                     Buffer.BlockCopy(cutCommand, 0, bytesWithCut, bytes.Length, cutCommand.Length);
                     bytes = bytesWithCut;
 
+                    renderModeUsed = "html";
                     _logger.LogInformation("Printed via HTML renderer ({RasterBytes} raster bytes + cut)", bytes.Length - 3);
                 }
                 catch (Exception ex)
@@ -76,6 +79,8 @@ public class WindowsPrinterService : IPrinterService
                         PrintJobType.KitchenOrder or PrintJobType.BarOrder => _builder.BuildKitchenOrder(request.Invoice),
                         _ => _builder.BuildReceipt(request.Invoice)
                     };
+                    renderModeUsed = "escpos-fallback";
+                    fallbackUsed = true;
                     _logger.LogInformation("Printed via ESC/POS fallback");
                 }
             }
@@ -87,6 +92,7 @@ public class WindowsPrinterService : IPrinterService
                     PrintJobType.KitchenOrder or PrintJobType.BarOrder => _builder.BuildKitchenOrder(request.Invoice),
                     _ => _builder.BuildReceipt(request.Invoice)
                 };
+                renderModeUsed = $"escpos:{_rendererMode}";
                 _logger.LogInformation("Printed via ESC/POS renderer ({Mode})", _rendererMode);
             }
 
@@ -114,13 +120,19 @@ public class WindowsPrinterService : IPrinterService
             }
 
             var jobId = Guid.NewGuid().ToString("N")[..8];
-            _logger.LogInformation("Print job {JobId} completed successfully", jobId);
+            _logger.LogInformation(
+                "Print job {JobId} completed successfully using {RenderMode}",
+                jobId,
+                renderModeUsed
+            );
 
             return new PrintResponse
             {
                 Success = true,
                 Message = "Print job sent successfully",
-                JobId = jobId
+                JobId = jobId,
+                RenderMode = renderModeUsed,
+                FallbackUsed = fallbackUsed
             };
         }
         catch (Exception ex)
@@ -129,7 +141,9 @@ public class WindowsPrinterService : IPrinterService
             return new PrintResponse
             {
                 Success = false,
-                Message = $"Print error: {ex.Message}"
+                Message = $"Print error: {ex.Message}",
+                RenderMode = "error",
+                FallbackUsed = false
             };
         }
     }
