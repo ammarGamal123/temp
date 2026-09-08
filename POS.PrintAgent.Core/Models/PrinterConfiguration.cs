@@ -7,7 +7,6 @@ public class PrinterConfiguration
 {
     public string Name { get; set; } = string.Empty;
     public string PrinterType { get; set; } = "thermal";  // thermal | a4
-    public string PrintMode { get; set; } = "auto";       // auto | driver | raw-escpos
     public int PaperWidth { get; set; } = 80;             // 58 | 80 | 210 (A4)
     public int PaperHeight { get; set; } = 200;
     public int Dpi { get; set; } = 203;

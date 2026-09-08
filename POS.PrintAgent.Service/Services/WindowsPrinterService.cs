@@ -48,13 +48,6 @@ public class WindowsPrinterService : IPrinterService
             // طبّق الـ config على الـ builder
             _builder.Configure(request.PrinterConfig);
 
-            // Universal routing: driver path works on ANY printer (thermal roll
-            // or A4 sheet). Raw ESC/POS only for proven thermals, otherwise garbage.
-            if (PrintRouter.ResolvePrintPath(request.PrinterConfig) == PrintRouter.Driver)
-            {
-                return await PrintViaDriverAsync(request, ct);
-            }
-
             byte[] bytes;
             var renderModeUsed = "escpos";
             var fallbackUsed = false;
@@ -150,74 +143,6 @@ public class WindowsPrinterService : IPrinterService
                 Success = false,
                 Message = $"Print error: {ex.Message}",
                 RenderMode = "error",
-                FallbackUsed = false
-            };
-        }
-    }
-
-    /// <summary>
-    /// Driver path: renders the receipt to PNG and prints via the Windows
-    /// driver. Works on any printer; RollMode vs SheetMode is decided by paper
-    /// inside PrintRouter. No cut / drawer kick here (driver printers eject
-    /// automatically and have no drawer on this path).
-    /// </summary>
-    private async Task<PrintResponse> PrintViaDriverAsync(PrintRequest request, CancellationToken ct)
-    {
-        try
-        {
-            var pngBytes = await _htmlReceiptService.RenderReceiptPngAsync(
-                request.Invoice, request.PrinterConfig, request.JobType, ct);
-
-            if (pngBytes == null || pngBytes.Length == 0)
-                throw new Exception("HTML renderer returned empty data");
-
-            var success = await Task.Run(
-                () => PrintRouter.PrintPngUsingWindowsDriver(
-                    request.PrinterName, pngBytes, request.Copies, request.PrinterConfig),
-                ct);
-
-            if (!success)
-            {
-                _logger.LogError("Driver print failed for printer '{Printer}'", request.PrinterName);
-                return new PrintResponse
-                {
-                    Success = false,
-                    Message = $"Failed to print on printer '{request.PrinterName}'",
-                    RenderMode = "html-driver",
-                    FallbackUsed = false
-                };
-            }
-
-            if (request.OpenCashDrawer)
-            {
-                _logger.LogInformation(
-                    "Cash drawer kick skipped on driver path for printer {Printer} (no drawer on this path)",
-                    request.PrinterName);
-            }
-
-            var jobId = Guid.NewGuid().ToString("N")[..8];
-            var paper = PrintRouter.IsSheetPaper(request.PrinterConfig) ? "sheet" : "roll";
-            _logger.LogInformation(
-                "Print job {JobId} completed successfully using html-driver ({Paper})",
-                jobId, paper);
-
-            return new PrintResponse
-            {
-                Success = true,
-                Message = "Print job sent successfully",
-                JobId = jobId,
-                RenderMode = $"html-driver:{paper}",
-                FallbackUsed = false
-            };
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Driver print failed for invoice {Invoice}", request.Invoice.InvoiceNumber);
-            return new PrintResponse
-            {
-                Success = false,
-                Message = $"Driver print error: {ex.Message}",
-                RenderMode = "html-driver",
                 FallbackUsed = false
             };
         }

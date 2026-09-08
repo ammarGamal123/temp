@@ -1,4 +1,8 @@
 using System.Text.Json;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
+using System.Drawing.Printing;
 using POS.PrintAgent.Core.Enums;
 using POS.PrintAgent.Core.Interfaces;
 using POS.PrintAgent.Core.Models;
@@ -18,7 +22,7 @@ public static class PrintEndpoints
         {
             status = "healthy",
             timestamp = DateTime.UtcNow,
-            version = "1.4.0"
+            version = "1.4.2"
         }))
         .WithTags("Health")
         .WithSummary("Health check")
@@ -123,58 +127,31 @@ public static class PrintEndpoints
 
             try
             {
-                var useRawEscPos = PrintRouter.ResolvePrintPath(cfg) == PrintRouter.RawEscPos;
-                if (useRawEscPos)
-                {
-                    var bytes = await htmlReceiptService.RenderRawHtmlAsync(request.Html, cfg, ct);
-                    var cutCommand = new byte[] { 0x1D, 0x56, 0x00 };
-                    var bytesWithCut = new byte[bytes.Length + cutCommand.Length];
-                    Buffer.BlockCopy(bytes, 0, bytesWithCut, 0, bytes.Length);
-                    Buffer.BlockCopy(cutCommand, 0, bytesWithCut, bytes.Length, cutCommand.Length);
-
-                    for (var i = 0; i < copies; i++)
-                    {
-                        var success = await Task.Run(
-                            () => RawPrinterHelper.SendBytesToPrinter(request.PrinterName, bytesWithCut),
-                            ct
-                        );
-                        if (!success)
-                            return Results.Problem($"Failed to send raw data to printer '{request.PrinterName}'");
-                    }
-                }
-                else
-                {
-                    var pngBytes = await htmlReceiptService.RenderRawHtmlPngAsync(request.Html, cfg, ct);
-                    var success = await Task.Run(
-                        () => PrintRouter.PrintPngUsingWindowsDriver(request.PrinterName, pngBytes, copies, cfg),
-                        ct
-                    );
-                    if (!success)
-                        return Results.Problem($"Failed to print HTML image on printer '{request.PrinterName}'");
-                }
+                var pngBytes = await htmlReceiptService.RenderRawHtmlPngAsync(request.Html, cfg, ct);
+                var success = await Task.Run(
+                    () => PrintPngUsingWindowsDriver(
+                        request.PrinterName,
+                        pngBytes,
+                        copies,
+                        cfg.PaperWidth,
+                        cfg.PrinterType),
+                    ct
+                );
+                if (!success)
+                    return Results.Problem($"Failed to print HTML image on printer '{request.PrinterName}'");
 
                 if (request.OpenCashDrawer)
                 {
-                    if (useRawEscPos)
-                    {
-                        var drawerBytes = new byte[] { 0x1B, 0x70, 0x00, 0x19, 0xFA };
-                        RawPrinterHelper.SendBytesToPrinter(request.PrinterName, drawerBytes);
-                    }
-                    else
-                    {
-                        logger.LogInformation(
-                            "Cash drawer kick skipped on driver path for printer {Printer} (no drawer on this path)",
-                            request.PrinterName);
-                    }
+                    var drawerBytes = new byte[] { 0x1B, 0x70, 0x00, 0x19, 0xFA };
+                    RawPrinterHelper.SendBytesToPrinter(request.PrinterName, drawerBytes);
                 }
 
                 var jobId = Guid.NewGuid().ToString("N")[..8];
                 logger.LogInformation(
-                    "HTML print job {JobId} completed. Printer: {Printer}, JobType: {JobType}, Path: {Path}",
+                    "HTML print job {JobId} completed. Printer: {Printer}, JobType: {JobType}, Path: html-gdi",
                     jobId,
                     request.PrinterName,
-                    jobType,
-                    useRawEscPos ? "raw-escpos" : "windows-driver"
+                    jobType
                 );
 
                 return Results.Ok(new PrintResponse
@@ -182,7 +159,7 @@ public static class PrintEndpoints
                     Success = true,
                     Message = "Print job sent successfully",
                     JobId = jobId,
-                    RenderMode = "html-direct",
+                    RenderMode = "html-gdi",
                     FallbackUsed = false
                 });
             }
@@ -194,7 +171,7 @@ public static class PrintEndpoints
         })
         .WithTags("Printing")
         .WithSummary("Print raw HTML silently")
-        .WithDescription("Renders provided HTML via PuppeteerSharp then sends raster data to printer silently. Requires X-Api-Key.")
+        .WithDescription("Renders provided frontend HTML to PNG via Chrome, then silent-prints it with the Windows printer driver. Never sends ESC/POS raw bytes. Requires X-Api-Key.")
         ;
 
         // Open cash drawer
@@ -520,8 +497,138 @@ public static class PrintEndpoints
         PrinterConfiguration? PrinterConfig,
         int JobType = 1,
         int Copies = 1,
-        bool OpenCashDrawer = false
+        bool OpenCashDrawer = false,
+        string? PrintMode = "windows"
     );
+
+    private static bool PrintPngUsingWindowsDriver(
+        string printerName,
+        byte[] pngBytes,
+        int copies,
+        int paperWidthMm,
+        string? printerType)
+    {
+        using var ms = new MemoryStream(pngBytes);
+        using var original = Image.FromStream(ms);
+        using var flattened = FlattenOntoWhite(original);
+        var invertForThermal = IsThermalPrinter(printerType, paperWidthMm, printerName);
+        using var inverted = invertForThermal ? InvertBitmap(flattened) : null;
+        var image = inverted ?? flattened;
+        var ok = true;
+        var widthMm = paperWidthMm > 0 ? paperWidthMm : 80;
+
+        for (var i = 0; i < Math.Max(copies, 1); i++)
+        {
+            using var doc = new PrintDocument
+            {
+                PrintController = new StandardPrintController(),
+                OriginAtMargins = false
+            };
+            doc.PrinterSettings.PrinterName = printerName;
+            if (!doc.PrinterSettings.IsValid) return false;
+            doc.DefaultPageSettings.Margins = new Margins(0, 0, 0, 0);
+
+            var widthHundredths = Math.Max(1, (int)Math.Round(widthMm / 25.4 * 100));
+            var heightHundredths = Math.Max(
+                widthHundredths,
+                (int)Math.Round(widthHundredths * (image.Height / (float)image.Width))
+            );
+            try
+            {
+                doc.DefaultPageSettings.PaperSize = new PaperSize("POS Receipt", widthHundredths, heightHundredths);
+            }
+            catch
+            {
+                // Keep printer default paper if custom size is rejected.
+            }
+
+            var srcOffsetY = 0;
+            doc.PrintPage += (_, e) =>
+            {
+                e.Graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                e.Graphics.SmoothingMode = SmoothingMode.HighQuality;
+
+                var page = e.MarginBounds.Width > 0 ? e.MarginBounds : e.PageBounds;
+                var hardX = (int)Math.Ceiling(e.PageSettings.HardMarginX);
+                var hardY = (int)Math.Ceiling(e.PageSettings.HardMarginY);
+                var inset = (int)Math.Round(2 / 25.4 * 100);
+                var destX = Math.Max(page.Left, hardX) + inset;
+                var destY = Math.Max(page.Top, hardY);
+                var destWidth = Math.Max(1, page.Right - destX - inset);
+                e.Graphics.FillRectangle(Brushes.White, page);
+
+                var scale = destWidth / (float)image.Width;
+                var remainingPx = image.Height - srcOffsetY;
+                var destHeight = (int)Math.Ceiling(remainingPx * scale);
+                if (destHeight > page.Height - destY) destHeight = Math.Max(1, page.Height - destY);
+                var srcHeight = Math.Max(1, (int)Math.Round(destHeight / scale));
+                if (srcOffsetY + srcHeight > image.Height)
+                    srcHeight = image.Height - srcOffsetY;
+
+                e.Graphics.DrawImage(
+                    image,
+                    new Rectangle(destX, destY, destWidth, destHeight),
+                    new Rectangle(0, srcOffsetY, image.Width, srcHeight),
+                    GraphicsUnit.Pixel
+                );
+
+                srcOffsetY += srcHeight;
+                e.HasMorePages = srcOffsetY < image.Height;
+            };
+            try
+            {
+                doc.Print();
+            }
+            catch
+            {
+                ok = false;
+                break;
+            }
+        }
+
+        return ok;
+    }
+
+    private static bool IsThermalPrinter(string? printerType, int paperWidthMm, string printerName)
+    {
+        var type = (printerType ?? string.Empty).Trim().ToLowerInvariant();
+        if (type is "thermal" or "pos") return true;
+        if (paperWidthMm > 0 && paperWidthMm <= 80) return true;
+        var name = (printerName ?? string.Empty).ToLowerInvariant();
+        return name.Contains("pos") || name.Contains("thermal") || name.Contains("80c");
+    }
+
+    private static Bitmap FlattenOntoWhite(Image source)
+    {
+        var bmp = new Bitmap(source.Width, source.Height, PixelFormat.Format24bppRgb);
+        using var g = Graphics.FromImage(bmp);
+        g.Clear(Color.White);
+        g.DrawImage(source, 0, 0, source.Width, source.Height);
+        return bmp;
+    }
+
+    private static Bitmap InvertBitmap(Bitmap source)
+    {
+        var dest = new Bitmap(source.Width, source.Height, PixelFormat.Format24bppRgb);
+        using var g = Graphics.FromImage(dest);
+        using var attrs = new ImageAttributes();
+        attrs.SetColorMatrix(new ColorMatrix(new float[][]
+        {
+            new float[] { -1f, 0, 0, 0, 0 },
+            new float[] { 0, -1f, 0, 0, 0 },
+            new float[] { 0, 0, -1f, 0, 0 },
+            new float[] { 0, 0, 0, 1f, 0 },
+            new float[] { 1f, 1f, 1f, 0, 1f }
+        }));
+        g.DrawImage(
+            source,
+            new Rectangle(0, 0, source.Width, source.Height),
+            0, 0, source.Width, source.Height,
+            GraphicsUnit.Pixel,
+            attrs);
+        return dest;
+    }
 
     private static InvoiceData CreateTestInvoice() => new()
     {

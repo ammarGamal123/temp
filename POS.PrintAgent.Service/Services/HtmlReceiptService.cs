@@ -233,24 +233,37 @@ public class HtmlReceiptService : IHtmlReceiptService
 
         try
         {
-            var viewportWidthPx = (int)(config.PaperWidth * config.Dpi / 25.4);
-            var viewportHeightPx = 800;
+            var viewportWidthPx = Math.Max(1, (int)Math.Round(config.PaperWidth * 96 / 25.4));
+            var viewportHeightPx = 1200;
 
             await page.SetViewportAsync(new ViewPortOptions
             {
                 Width = viewportWidthPx,
                 Height = viewportHeightPx,
-                DeviceScaleFactor = 1
+                DeviceScaleFactor = 2
             });
 
             await page.SetContentAsync(html, new SetContentOptions { WaitUntil = [WaitUntilNavigation.Load] });
+            await page.EvaluateExpressionAsync(
+                "document.documentElement.style.background='white'; if (document.body) document.body.style.background='white';");
+            try
+            {
+                await page.WaitForFunctionAsync(
+                    "document.fonts ? document.fonts.status === 'loaded' : true",
+                    new WaitForFunctionOptions { Timeout = 1500 });
+            }
+            catch
+            {
+                await Task.Delay(400, ct);
+            }
 
             var screenshotOptions = new ScreenshotOptions
             {
                 FullPage = true,
                 Type = ScreenshotType.Png,
+                OmitBackground = false,
                 Clip = null,
-                CaptureBeyondViewport = false
+                CaptureBeyondViewport = true
             };
 
             var pngData = await page.ScreenshotDataAsync(screenshotOptions);

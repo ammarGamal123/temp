@@ -161,7 +161,7 @@ public static class EscapeGSImageHelper
                         for (var x = 0; x < widthBytes; x++)
                         {
                             var b = pSrc[srcRow + x];
-                            ms.WriteByte(b);
+                            ms.WriteByte((byte)(b ^ 0xFF));
                         }
                     }
                 }

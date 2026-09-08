@@ -69,7 +69,7 @@ builder.Services.AddSwaggerGen(options =>
     options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
     {
         Title = "POS Print Agent API",
-        Version = "v1.4.0",
+        Version = "v1.1.0",
         Description = "Local printing agent for POS — HTML/CSS receipt rendering via Chrome/PuppeteerSharp, ESC/POS fallback, ZATCA QR, cash drawer. Base URL: http://localhost:5050 | Auth: X-Api-Key header (except /health, /swagger, /scalar)"
     });
     // Include XML comments if present
@@ -114,7 +114,7 @@ app.UseMiddleware<ApiKeyMiddleware>();
 app.UseSwagger();
 app.UseSwaggerUI(options =>
 {
-    options.SwaggerEndpoint("/swagger/v1/swagger.json", "POS Print Agent v1.4.0");
+    options.SwaggerEndpoint("/swagger/v1/swagger.json", "POS Print Agent v1.0.1");
     options.RoutePrefix = "swagger"; // -> /swagger
 });
 app.MapScalarApiReference(options =>
